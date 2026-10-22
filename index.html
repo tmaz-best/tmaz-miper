@@ -297,6 +297,8 @@ nav.steps{grid-template-columns:repeat(7,minmax(0,1fr))}
 .pillrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .empty{padding:16px;border:1.5px dashed var(--border-strong);border-radius:var(--r-m);color:var(--muted);text-align:center}
 select optgroup{font-weight:800}
+.navrow{align-items:center}
+@media (max-width:620px){.navrow [data-backup]{order:3;flex-basis:100%}}
 @media (min-width:961px){.layout.solo{grid-template-columns:minmax(0,1fr)}}
 </style>
 </head>
@@ -309,6 +311,7 @@ select optgroup{font-weight:800}
       <h1 id="hTitle">Matriz de Identificación de Peligros y Evaluación de Riesgos</h1>
     </div>
     <div class="tools">
+      <button class="chipbtn" id="bkBtn" type="button" title="Descargar respaldo .json">⬇ Respaldo</button>
       <button class="chipbtn" id="consBtn" type="button">⧉ Consolidar</button>
       <button class="chipbtn" id="themeBtn" type="button"></button>
     </div>
@@ -479,7 +482,7 @@ function renderSteps(){
   nav.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>go(+b.dataset.go));
 }
 function go(i){ S.step=Math.max(0,Math.min(6,i)); S.view='edit'; save(); render(); window.scrollTo({top:0,behavior:'smooth'}); }
-const navRow=i=>`<div class="navrow">${i>0?`<button class="btn" data-nav="${i-1}">← Anterior</button>`:'<span></span>'}${i<6?`<button class="btn primary" data-nav="${i+1}">Siguiente: ${esc(STEPS[i+1][0])} →</button>`:''}</div>`;
+const navRow=i=>`<div class="navrow">${i>0?`<button class="btn" data-nav="${i-1}">← Anterior</button>`:'<span></span>'}<button class="btn ghost" data-backup="1" title="Descarga un archivo .json para continuar después o en otro equipo">⬇ Descargar respaldo</button>${i<6?`<button class="btn primary" data-nav="${i+1}">Siguiente: ${esc(STEPS[i+1][0])} →</button>`:''}</div>`;
 
 /* ---------- campos ---------- */
 const fld=(lab,path,o={})=>{ const v=getP(path)??''; const id='f-'+path.replace(/\./g,'-');
@@ -762,7 +765,8 @@ function wire(m){
   on('loadEx',()=>{ S=example(); S.isExample=true; normalize(); save(); render(); toast('Ejemplo de izaje cargado'); });
   on('clrEx',()=>{ S=blank(); store(KEY,JSON.stringify(S)); render(); toast('Listo: matriz en blanco'); });
   on('resetBtn',()=>confirmBox('Se borra la matriz abierta en este navegador. ¿Descargaste el respaldo?','Sí, empezar de nuevo',()=>{ S=blank(); save(); render(); toast('Proceso nuevo'); }));
-  on('jsonBtn',()=>{ downloadBlob(new Blob([JSON.stringify({tipo:'miperc-r12',version:1,estado:S},null,1)],{type:'application/json'}),baseName()+'.json'); toast('Respaldo descargado'); });
+  on('jsonBtn',backup);
+  m.querySelectorAll('[data-backup]').forEach(b=>b.onclick=backup);
   on('xlsxBtn',()=>runExport(async()=>{ const rows=rowsFromState(S); if(!rows.length) throw new Error('no hay peligros registrados'); downloadBlob(await buildXlsx(rows,hdrInfo()),baseName()+'.xlsx'); return 'Excel descargado'; }));
   on('pdfBtn',()=>runExport(async()=>{ const rows=rowsFromState(S); if(!rows.length) throw new Error('no hay peligros registrados'); downloadBlob(await buildPdf(rows,hdrInfo()),baseName()+'.pdf'); return 'PDF descargado'; }));
   on('goCons',()=>{ S.view='cons'; save(); render(); window.scrollTo({top:0}); });
@@ -777,6 +781,8 @@ function wire(m){
   const dz=document.getElementById('drop');
   if(dz){ ['dragenter','dragover'].forEach(e=>dz.addEventListener(e,ev=>{ ev.preventDefault(); dz.classList.add('over'); })); ['dragleave','drop'].forEach(e=>dz.addEventListener(e,ev=>{ ev.preventDefault(); dz.classList.remove('over'); })); dz.addEventListener('drop',ev=>loadConsFiles([...ev.dataTransfer.files])); }
 }
+function backup(){ downloadBlob(new Blob([JSON.stringify({tipo:'miperc-r12',version:1,estado:S},null,1)],{type:'application/json'}),baseName()+'_respaldo.json'); toast('Respaldo descargado: para continuar, ábrelo con “Abrir Excel o respaldo” en el paso 1'); }
+document.getElementById('bkBtn').onclick=backup;
 async function runExport(fn){ try{ const msg=await fn(); toast(msg); }catch(e){ console.error(e); toast('No se pudo generar: '+(e.message||e)); } }
 
 const hdrInfo=()=>({...S.hdr,consolidado:false,firmas:signers(false)});
